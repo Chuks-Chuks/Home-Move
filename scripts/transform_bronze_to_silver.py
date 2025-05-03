@@ -135,3 +135,33 @@ summary_df = customers.join(feedback_summary, on='customer_id', how='left') \
 )
 
 summary_df.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_summary')
+
+"""
+    This is to check how much houses are worth in various locations
+"""
+
+property_summary = properties.groupBy('region', 'property_type') \
+.agg(
+    count('*').alias('num_properties'),
+    avg('valuation').alias('avg_valuation'),
+    min('valuation').alias('min_valuation'),
+    max('valuation').alias('max_valuation')
+)
+
+property_summary.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_summary')
+
+
+"""
+    I will creating a transaction summary to detail which properties are being bought the most, total and average price. 
+"""
+
+transaction_summary = transactions.join(properties, on='property_id', how='left') \
+.groupBy('property_type', 'status') \
+.agg(
+    count('*').alias('num_transactions'),
+    sum('valuation').alias('total_value'),
+    avg('valuation').alias('avg_valuation')
+)
+# transaction_summary.show()
+
+transaction_summary.write.mode('overwrite').parquet(f'{SILVER_PATH}/transaction_summary')
