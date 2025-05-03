@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, datediff
+from pyspark.sql.functions import col, to_date, datediff, count, sum, avg
 from pathlib import Path
 
 # Start spark
@@ -95,3 +95,43 @@ property_transactions = transactions.join(properties, on='property_id', how='lef
 )
 
 property_transactions.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_transactions')
+
+"""
+    The next join is to find out the valuable customers. 
+    I will be finding out:
+        - The number of homes bought or sold
+        - Total amount and average spent
+        - Check how many feedbacks has been given, average feedback
+"""
+
+# First, aggregating the transactions by customer_id
+
+transaction_summary = transactions.join(properties, on='property_id', how='left').groupBy('customer_id').agg(
+    count('*').alias('num_transactions'),  # Finding the total number of transactions
+    sum('valuation').alias('total_spent'),  # Finding the total amount spent
+    avg('valuation').alias('avg_spent')  # Finding the average amount spent
+)
+
+feedback_summary = csat.join(transactions, on='transaction_id', how='left') \
+.join(customers, on='customer_id', how='left').groupBy(
+    'customer_id'
+).agg(
+    count('*').alias('num_feedbacks'),
+    avg('score').alias('avg_feedback_score')
+)
+
+# Merging both transaction and summary tables
+
+summary_df = customers.join(feedback_summary, on='customer_id', how='left') \
+.join(transaction_summary, on='customer_id', how='left') \
+.fillna(
+    {
+        'num_transactions': 0,
+        'total_spent': 0,
+        'avg_spent': 0.0,
+        'num_feedbacks': 0,
+        'avg_feedback_score': 0.0
+    }
+)
+
+summary_df.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_summary')
