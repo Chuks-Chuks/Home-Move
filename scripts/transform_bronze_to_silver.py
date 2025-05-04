@@ -1,14 +1,15 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, datediff, count, sum, avg
+from constant_class import Constants
 from pathlib import Path
 
 # Start spark
 
-spark = SparkSession.builder.appName('Transform Bronze to Silver').getOrCreate()
+const = Constants()
+spark = const.start_spark('Transform Bronze to Silver')
+
 
 # Define Paths 
-BRONZE_PATH = './data/bronze'
-SILVER_PATH = './data/silver'
+BRONZE_PATH = const.BRONZE_PATH
+SILVER_PATH = const.SILVER_PATH
 
 Path(SILVER_PATH).mkdir(parents=True, exist_ok=True)  # Creates the directory if it doesn't exists. 
 
@@ -48,8 +49,8 @@ customer_transactions = transactions \
 # Also, i will be dropping values with null to ensure the dataset is compact and complete 
 # Converting dates to date type
 
-customer_transactions = customer_transactions.withColumn('start_date', to_date('start_date')) \
-.withColumn('completion_date', to_date('completion_date'))
+customer_transactions = customer_transactions.withColumn('start_date', const.psq.to_date('start_date')) \
+.withColumn('completion_date', const.psq.to_date('completion_date'))
 
 # print(customer_transactions.printSchema()) # The date format is now correct
 
@@ -68,7 +69,7 @@ feedback_df = csat.join(transactions, on='transaction_id', how='left') \
     'full_name',
     'email',
     'score',
-    col('comment').alias('feedback'),
+    const.psq.col('comment').alias('feedback'),
     'survey_date'
 )
 
@@ -107,17 +108,17 @@ property_transactions.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_t
 # First, aggregating the transactions by customer_id
 
 transaction_summary = transactions.join(properties, on='property_id', how='left').groupBy('customer_id').agg(
-    count('*').alias('num_transactions'),  # Finding the total number of transactions
-    sum('valuation').alias('total_spent'),  # Finding the total amount spent
-    avg('valuation').alias('avg_spent')  # Finding the average amount spent
+    const.psq.count('*').alias('num_transactions'),  # Finding the total number of transactions
+    const.psq.sum('valuation').alias('total_spent'),  # Finding the total amount spent
+   const.psq.avg('valuation').alias('avg_spent')  # Finding the average amount spent
 )
 
 feedback_summary = csat.join(transactions, on='transaction_id', how='left') \
 .join(customers, on='customer_id', how='left').groupBy(
     'customer_id'
 ).agg(
-    count('*').alias('num_feedbacks'),
-    avg('score').alias('avg_feedback_score')
+    const.psq.count('*').alias('num_feedbacks'),
+    const.psq.avg('score').alias('avg_feedback_score')
 )
 
 # Merging both transaction and summary tables
@@ -142,10 +143,10 @@ summary_df.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_summary')
 
 property_summary = properties.groupBy('region', 'property_type') \
 .agg(
-    count('*').alias('num_properties'),
-    avg('valuation').alias('avg_valuation'),
-    min('valuation').alias('min_valuation'),
-    max('valuation').alias('max_valuation')
+    const.psq.count('*').alias('num_properties'),
+    const.psq.avg('valuation').alias('avg_valuation'),
+    const.psq.min('valuation').alias('min_valuation'),
+    const.psq.max('valuation').alias('max_valuation')
 )
 
 property_summary.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_summary')
@@ -158,9 +159,9 @@ property_summary.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_summar
 transaction_summary = transactions.join(properties, on='property_id', how='left') \
 .groupBy('property_type', 'status') \
 .agg(
-    count('*').alias('num_transactions'),
+    const.psq.count('*').alias('num_transactions'),
     sum('valuation').alias('total_value'),
-    avg('valuation').alias('avg_valuation')
+    const.psq.avg('valuation').alias('avg_valuation')
 )
 # transaction_summary.show()
 
