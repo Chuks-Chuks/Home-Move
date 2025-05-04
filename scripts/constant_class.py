@@ -9,6 +9,7 @@ class Constants:
         self.BRONZE_PATH = './data/bronze'
         self.SILVER_PATH = './data/silver'       
         self.GOLD_PATH = './data/gold'
+        self.REPORTING_PATH = './data/reporting'
         self.psq = psq
 
     
