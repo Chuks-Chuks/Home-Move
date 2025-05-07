@@ -21,4 +21,4 @@ revenue_summary_monthly_prop = transaction_summary.filter(const.psq.col('status'
 # revenue_summary_monthly_prop.limit(2).show()
 
 # Writing to the gold table
-revenue_summary_monthly_prop.write.mode('overwrite').parquet(f'{GOLD_PATH}/revenue_summary_monthly_prop')
+revenue_summary_monthly_prop.write.mode('overwrite').parquet(f'{const.GOLD_PATH}/revenue_summary_monthly_prop')
