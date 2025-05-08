@@ -63,3 +63,5 @@ with DAG(
         dag=dag
     )
 
+# Defining dependencies
+task_get_customers >> task_get_properties >> task_fetch_transactions >> task_fetch_cust_feedback
