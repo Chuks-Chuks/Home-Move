@@ -10,6 +10,8 @@ class Constants:
         self.SILVER_PATH = './data/silver'       
         self.GOLD_PATH = './data/gold'
         self.REPORTING_PATH = './data/reporting'
+        self.RAW_PATH = './data/raw'
+        self.ABSOLUTE_PATH = "./Users/phili/etl_project/homemove-analytics"
         self.psq = psq
 
     
