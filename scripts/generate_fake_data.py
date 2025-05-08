@@ -4,105 +4,126 @@ from random import seed, choice, uniform, randint
 import uuid
 from datetime import timedelta
 from pathlib import Path
+from constant_class import Constants
 
-fake = Faker()
-Faker.seed(42)
-seed(42)
+class IngestData(Constants):
+    def __init__(self):
+        super().__init__()
+        self.fake = Faker()
+        Faker.seed(42)
+        seed(42)
+        self.customers = []
+        self.properties = []
+        # Pointing out the path to save the data
+        self.OUTPUT_DIR = Path(self.RAW_PATH)
+        self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  
+        self.transactions = []
+        self.transactions_ids = []
 
-# Pointing out the path to save the data
-OUTPUT_DIR = Path("../data/raw")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't already exist. 
+# Create the directory if it doesn't already exist. 
+     # 1. Customers
+    def fetch_customers(self) -> None:
+        """
+        This method ingests the customer's data
 
-NUM_CUSTOMERS = 5000
-NUM_PROPERTIES = 3000
-NUM_TRANSACTIONS = 4500
-NUM_CSATS = 1500
-MINIMUM_HOUSE_PRICE = 150000
-MAXIMUM_HOUSE_PRICE = 750000
+        :returns:
+            None (Creates a file of the customer's details in the raw folder)
+        """
 
-# 1. Customers
-customers = []  # Initialising an empty list to capture the customer's details
+        for customer in range(self.NUM_CUSTOMERS):
+            self.customers.append(
+                {
+                    'customer_id': str(uuid.uuid4())[:8],
+                    'full_name': self.fake.name(),
+                    'email': self.fake.email(),
+                    'signup_date': self.fake.date_between(start_date='-3y', end_date='-1d'),
+                    'region': choice(["North West", "London", "South East", "Scotland", "East Midlands", "West Midlands", "South West", "Yorkshire and the Humber"]),
+                    'source_channel': choice(["Website", "Referral", "Estate Agent"])
+                }
+            )  # Pulling mock data to fit the customer schema
 
-for customer in range(NUM_CUSTOMERS):
-    customers.append(
-        {
-            'customer_id': str(uuid.uuid4())[:8],
-            'full_name': fake.name(),
-            'email': fake.email(),
-            'signup_date': fake.date_between(start_date='-3y', end_date='-1d'),
-            'region': choice(["North West", "London", "South East", "Scotland", "East Midlands", "West Midlands", "South West", "Yorkshire and the Humber"]),
-            'source_channel': choice(["Website", "Referral", "Estate Agent"])
-        }
-    )  # Pulling mock data to fit the customer schema
+        df_customers = pd.DataFrame(self.customers)
+        return df_customers.to_csv(self.OUTPUT_DIR / "customers.csv", index=False)
 
-df_customers = pd.DataFrame(customers)
-df_customers.to_csv(OUTPUT_DIR / "customers.csv", index=False)
+    # 2. Properties = []
+    def fetch_properties(self) -> None:
+        """
+        Fetches all property details.
 
-# 2. Properties = []
+        :returns:
+            None (Writes csv file to raw folder)
+        """
+        for _ in range(self.NUM_PROPERTIES):
+            self.properties.append(
+                {
+                    'property_id': str(uuid.uuid4())[:5],
+                    'address': self.fake.street_address(),
+                    'postcode': self.fake.postcode(),
+                    'property_type': choice(["Flat", "Detached", "Terraced", "Semi-detached"]),
+                    'valuation': round(uniform(self.MINIMUM_HOUSE_PRICE, self.MAXIMUM_HOUSE_PRICE), 2),
+                    'region': choice(["North West", "London", "South East", "Scotland", "East Midlands", "West Midlands", "South West", "Yorkshire and the Humber"])
+                }
+            )
 
-properties = []
-for _ in range(NUM_PROPERTIES):
-    properties.append(
-        {
-            'property_id': str(uuid.uuid4())[:5],
-            'address': fake.street_address(),
-            'postcode': fake.postcode(),
-            'property_type': choice(["Flat", "Detached", "Terraced", "Semi-detached"]),
-            'valuation': round(uniform(MINIMUM_HOUSE_PRICE, MAXIMUM_HOUSE_PRICE), 2),
-            'region': choice(["North West", "London", "South East", "Scotland", "East Midlands", "West Midlands", "South West", "Yorkshire and the Humber"])
-        }
-    )
-
-df_properties = pd.DataFrame(properties)
-df_properties.to_csv(OUTPUT_DIR / "properties.csv", index=False)
-
-
-# 3. Transactions
-
-transactions = []
-transactions_ids = []
-
-for transaction in range(NUM_TRANSACTIONS):
-    customer = choice(customers)
-    property_choice = choice(properties)
-    start_date = fake.date_between(start_date='-2y', end_date='-20d')
-    status = choice(["Started", "Under Offer", "Completed", "Abandoned"])
-    complete_date = fake.date_between(start_date=start_date, end_date='today') if status == "Completed" else "N/A"
-    transactions_id = str(uuid.uuid4())
-    transactions_ids.append(transactions_id)
-
-    transactions.append(
-        {
-            'transaction_id': transactions_id,
-            'customer_id': customer['customer_id'],
-            'property_id': property_choice['property_id'],
-            'solicitor_name': fake.name(),
-            'status': status,
-            'start_date': start_date,
-            'completion_date': complete_date, 
-            'current_stage': choice(['Search', 'Contracts', 'Survey', 'Offer', 'N/A']) if status != 'Completed' else "N/A"
-        }
-    )
-
-df_transactions = pd.DataFrame(transactions)
-df_transactions.to_csv(OUTPUT_DIR / "transactions.csv", index=False)
+        df_properties = pd.DataFrame(self.properties)
+        return df_properties.to_csv(self.OUTPUT_DIR / "properties.csv", index=False)
 
 
-# 4. CSAT (Customer Satisfaction)
+    # 3. Transactions
+    def fetch_transactions(self) -> None:
+        """
+        Fetches all the transactions 
 
-csat = []
-for review in range(NUM_CSATS):
-    transaction = choice(transactions)
-    if transaction['status'] != 'Abadoned':
-        csat.append(
-            {
-                'survey_id': str(uuid.uuid4())[:6],
-                'transaction_id': transaction['transaction_id'],
-                'survey_date': fake.date_between(start_date=transaction['start_date'], end_date='today'),
-                'score': randint(1, 5),
-                'comment': fake.sentence(nb_words=15)
-            }
-        )
+        :returns:   
+            None (Writes transaction details to the raw folder)
+        """
 
-df_csat = pd.DataFrame(csat)
-df_csat.to_csv(OUTPUT_DIR / "csat_surveys.csv", index=False)
+        for transaction in range(self.NUM_TRANSACTIONS):
+            customer = choice(self.customers)
+            property_choice = choice(self.properties)
+            start_date = self.fake.date_between(start_date='-2y', end_date='-20d')
+            status = choice(["Started", "Under Offer", "Completed", "Abandoned"])
+            complete_date = self.fake.date_between(start_date=start_date, end_date='today') if status == "Completed" else "N/A"
+            transactions_id = str(uuid.uuid4())
+            self.transactions_ids.append(transactions_id)
+
+            self.transactions.append(
+                {
+                    'transaction_id': transactions_id,
+                    'customer_id': customer['customer_id'],
+                    'property_id': property_choice['property_id'],
+                    'solicitor_name': self.fake.name(),
+                    'status': status,
+                    'start_date': start_date,
+                    'completion_date': complete_date, 
+                    'current_stage': choice(['Search', 'Contracts', 'Survey', 'Offer', 'N/A']) if status != 'Completed' else "N/A"
+                }
+            )
+
+        df_transactions = pd.DataFrame(self.transactions)
+        return df_transactions.to_csv(self.OUTPUT_DIR / "transactions.csv", index=False)
+
+
+    # 4. CSAT (Customer Satisfaction)
+    def fetch_cust_feedback(self) -> None:
+        """
+            Fetches all customer feedback.
+
+            :returns:
+                None (Writes csv file to raw folder)
+        """
+        for review in range(self.NUM_CSATS):
+            transaction = choice(self.transactions)
+            if transaction['status'] != 'Abadoned':
+                self.csat.append(
+                    {
+                        'survey_id': str(uuid.uuid4())[:6],
+                        'transaction_id': transaction['transaction_id'],
+                        'survey_date': self.fake.date_between(start_date=transaction['start_date'], end_date='today'),
+                        'score': randint(1, 5),
+                        'comment': self.fake.sentence(nb_words=15)
+                    }
+                )
+
+        df_csat = pd.DataFrame(self.csat)
+        return df_csat.to_csv(self.OUTPUT_DIR / "csat_surveys.csv", index=False)
