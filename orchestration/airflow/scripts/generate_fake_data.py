@@ -7,7 +7,6 @@ from constant_class import Constants
 import logging
 
 # Setup logging
-
 class IngestData(Constants):
     def __init__(self):
         super().__init__()
