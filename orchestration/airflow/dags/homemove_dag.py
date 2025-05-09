@@ -1,8 +1,14 @@
+import logging
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from scripts import constant_class as c
 from scripts import generate_fake_data as gfd
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 const = c.Constants()
 ingestion = gfd.IngestData()
@@ -63,5 +69,9 @@ with DAG(
         dag=dag
     )
 
+logging.info("Now tracking dependencies...")
+
 # Defining dependencies
 task_get_customers >> task_get_properties >> task_fetch_transactions >> task_fetch_cust_feedback
+
+logging.info("Raw data initialised and completed")

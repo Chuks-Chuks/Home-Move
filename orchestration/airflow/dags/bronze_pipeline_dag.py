@@ -1,7 +1,12 @@
+import logging
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 from scripts import constant_class as c
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 const = c.Constants()
@@ -25,3 +30,4 @@ with DAG(
         bash_command='spark-submit /Users/phili/etl_project/homemove-analytics/scripts/process_raw_to_parquet.py'
     )
 
+logging.info("DAG initialised and transformation to bronze completed")
