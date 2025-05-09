@@ -6,6 +6,8 @@ from pathlib import Path
 from constant_class import Constants
 import logging
 
+# Setup logging
+
 class IngestData(Constants):
     def __init__(self):
         super().__init__()
@@ -19,6 +21,7 @@ class IngestData(Constants):
         self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  
         self.transactions = []
         self.transactions_ids = []
+        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
 # Create the directory if it doesn't already exist. 
