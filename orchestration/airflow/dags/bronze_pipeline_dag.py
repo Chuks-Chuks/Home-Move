@@ -34,7 +34,7 @@ with DAG(
 ) as dag:
     raw_to_bronze = BashOperator(
         task_id='transform-csvs-to-parquet-files',
-        bash_command='spark-submit /Users/phili/etl_project/homemove-analytics/orchestration/airflow/scripts/process_raw_to_parquet.py'
+        bash_command='spark-submit /opt/airflow/scripts/process_raw_to_parquet.py'
     )
 
 logging.info("DAG initialised and transformation to bronze completed")
