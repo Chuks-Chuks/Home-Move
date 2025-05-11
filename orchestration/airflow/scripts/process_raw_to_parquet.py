@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 from constant_class import Constants
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 const = Constants()
 
 
@@ -17,10 +20,15 @@ transactions_df = spark.read.option('header', 'true').csv(f"{const.RAW_PATH}/tra
 csat_df = spark.read.option('header', 'true').csv(f"{const.RAW_PATH}/csat_surveys.csv", inferSchema=True)
 
 # COnverting the CSV files to parquet to enable faster processing
-
-customer_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/customers')
-properties_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/properties')
-transactions_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/transactions')
-csat_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/csat')
+try:
+    logging.info("Now reading files")
+    customer_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/customers')
+    properties_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/properties')
+    transactions_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/transactions')
+    csat_df.write.mode('overwrite').parquet(f'{BRONZE_PATH}/csat')
+except Exception as e:
+    logging.error(f"Failed to convert files: {str(e)}")
 
 spark.stop()
+
+logging.info("Transformation completed to parquet and loaded in the bronze folder.")
