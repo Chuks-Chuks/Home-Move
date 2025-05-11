@@ -21,7 +21,8 @@ const = Constants()
 default_args = {
     'owner': 'chuks-chuks', 
     'retries': 1,
-    'retry_delay': timedelta(minutes=3)
+    'retry_delay': timedelta(minutes=3),
+    'depends_on_past': False,
 }
 
 with DAG(
@@ -36,5 +37,6 @@ with DAG(
         task_id='transform-csvs-to-parquet-files',
         bash_command='spark-submit /opt/airflow/scripts/process_raw_to_parquet.py'
     )
+
 
 logging.info("DAG initialised and transformation to bronze completed")
