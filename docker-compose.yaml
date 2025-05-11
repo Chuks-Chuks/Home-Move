@@ -8,6 +8,8 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       PYTHON_PATH: /opt/airflow
+      SPARK_PATH: /opt/spark
+      PATH: ${PATH}:/opt/spark/bin
     volumes:
       - ${PWD}/orchestration/airflow/dags:/opt/airflow/dags
       - ${PWD}/orchestration/airflow/scripts:/opt/airflow/scripts
@@ -16,9 +18,11 @@ services:
       - "8887:8080"
     command: >
       bash -c "
-        pip install pyspark faker &&
         airflow db migrate &&
         airflow connections create-default-connections &&
         airflow users create --username admin --password admin --firstname Air --lastname Flow --role Admin --email admin@example.com &&
         (airflow webserver & airflow scheduler)
       "
+    build: 
+      context: .
+      dockerfile: Dockerfile.airflow
