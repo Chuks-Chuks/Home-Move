@@ -2,15 +2,22 @@ import logging
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-from scripts import constant_class as c
-from scripts import generate_fake_data as gfd
-
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+try:
+    from scripts.constant_class import Constants
+    import scripts.generate_fake_data as gfd
+except ImportError as ie:
+    logging.warning("Import failed! Now trying alternative solution")
+    import sys
+    sys.path.insert(0, '/opt/airflow')
+    from scripts.constant_class import Constants
+    from scripts import generate_fake_data as gfd
 
-const = c.Constants()
+
+const = Constants()
 ingestion = gfd.IngestData()
 
 def fetch_customers():
