@@ -3,7 +3,7 @@ import pandas as pd
 from random import seed, choice, uniform, randint
 import uuid
 from pathlib import Path
-from constant_class import Constants
+from scripts.constant_class import Constants
 import logging
 
 # Setup logging
