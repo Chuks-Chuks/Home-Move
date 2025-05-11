@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  airflow:
+    image: apache/airflow:2.7.3-python3.10
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      PYTHON_PATH: /opt/airflow
+    volumes:
+      - ${PWD}/orchestration/airflow/dags:/opt/airflow/dags
+      - ${PWD}/orchestration/airflow/scripts:/opt/airflow/scripts
+      - ${PWD}/data:/opt/airflow/data
+    ports:
+      - "8887:8080"
+    command: >
+      bash -c "
+        pip install pyspark faker &&
+        airflow db migrate &&
+        airflow connections create-default-connections &&
+        airflow users create --username admin --password admin --firstname Air --lastname Flow --role Admin --email admin@example.com &&
+        (airflow webserver & airflow scheduler)
+      "
