@@ -1,29 +1,28 @@
-# version: '3.8'
+version: '3.8'
 services:
   airflow:
-    image: apache/airflow:2.7.3-python3.10
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     environment:
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
-      PYTHON_PATH: /opt/airflow
-      SPARK_PATH: /opt/spark
-      PATH: ${PATH}:/opt/spark/bin
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
     volumes:
       - ${PWD}/orchestration/airflow/dags:/opt/airflow/dags
       - ${PWD}/orchestration/airflow/scripts:/opt/airflow/scripts
       - ${PWD}/data:/opt/airflow/data
     ports:
-      - "8887:8080"
+      - "8080:8080"
     command: >
-      /bin/bash -c "
-        echo 'Bash is available at: $(which bash)' &&
-        airflow db init &&
-        airflow connections create-default-connections &&
-        airflow users create --username admin --password admin --firstname Air --lastname Flow --role Admin --email admin@example.com &&
-        (airflow webserver & airflow scheduler)
+      bash -c "
+        set -x;
+        echo 'Using bash: $(which bash)';
+        airflow db init;
+        airflow users create --username admin --password admin --firstname Air --lastname Flow --role Admin --email admin@example.com;
+        exec airflow standalone
       "
-    build: 
-      context: .
-      dockerfile: Dockerfile.airflow
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

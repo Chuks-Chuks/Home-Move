@@ -1,50 +1,36 @@
 FROM apache/airflow:2.8.0-python3.10
 
-# Switch to root for system installations
+# Force proper Bash installation
 USER root
-
-# 1. Install Java (Spark dependency) - Optimized version
-RUN cat /etc/os-release &&  \
-    apt-get update -y && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
-        coreutils \
-        openjdk-17-jdk-headless \
-        procps \
-        curl && \
+        coreutils && \
     ln -sf bash /bin/sh && \
     rm -rf /var/lib/apt/lists/* && \
-    echo "Bash installed at:" && which bash && \
-    echo "Bash version:" && bash --version
+    echo "Bash installed at: $(which bash)" && \
+    bash --version
 
-# 2. Install Spark (using fixed paths)
+# Spark installation
 COPY spark/spark-3.5.0-bin-hadoop3.tgz /tmp/
-
 RUN tar xzf /tmp/spark-3.5.0-bin-hadoop3.tgz -C /opt && \
-    [ ! -d "/opt/spark/spark-3.5.0-bin-hadoop3" ] && \
     mv /opt/spark-3.5.0-bin-hadoop3 /opt/spark && \
     rm /tmp/spark-3.5.0-bin-hadoop3.tgz
 
-# 3. Set Spark environment variables
-ENV SPARK_HOME=/opt/spark
-ENV PATH="${PATH}:${SPARK_HOME}/bin"
-ENV PYTHONPATH="${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.9.7-src.zip"
+# Environment setup
+ENV SPARK_HOME=/opt/spark \
+    PATH="/opt/spark/bin:${PATH}" \
+    SHELL=/bin/bash
 
-# 4. Switch back to airflow user
 USER airflow
 
-# 5. Install Python dependencies with version pinning
 RUN pip install --no-cache-dir \
     pyspark==3.5.0 \
     pyarrow==14.0.2 \
     pandas==2.1.4 \
     apache-airflow-providers-apache-spark==4.3.0
 
-# 6. Verify installations
-RUN python -c "import pyspark; print(f'PySpark {pyspark.__version__} installed')" && \
-    python -c "import pyarrow; print(f'PyArrow {pyarrow.__version__} installed')"
-
-RUN echo "Final verification:" && \
-    ls -l /bin/bash && \
-    ls -l /bin/sh && \
-    bash --version
+# Environment setup
+ENV SPARK_HOME=/opt/spark \
+    PATH="/opt/spark/bin:${PATH}" \
+    PYTHONPATH="/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip"
