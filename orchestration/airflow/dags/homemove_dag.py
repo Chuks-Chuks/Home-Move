@@ -2,6 +2,7 @@ import logging
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
+import pandas as pd
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,16 +21,33 @@ except ImportError as ie:
 const = Constants()
 ingestion = gfd.IngestData()
 
-def fetch_customers():
-    return ingestion.fetch_customers()
+def fetch_customers(**kwargs):
+    df = ingestion.fetch_customers()
+    kwargs['ti'].xcom_push(key='customers', value=df.to_dict())
+    return df
 
-def fetch_properties():
-    return ingestion.fetch_properties()
 
-def fetch_transactions():
-    return ingestion.fetch_transactions()
+def fetch_properties(**kwargs):
+    df = ingestion.fetch_properties()
+    kwargs['ti'].xcom_push(key='properties', value=df.to_dict())
+    return df
 
-def fetch_cust_feedback():
+
+def fetch_transactions(**kwargs):
+    ti = kwargs['ti']
+    customers = pd.DataFrame(ti.xcom_pull(task_ids='fetch_customers', key='customers'))
+    properties = pd.DataFrame(ti.xcom_pull(task_ids='fetch_properties', key='properties'))
+    ingestion.customers = customers.to_dict('records')
+    ingestion.properties = properties.to_dict('records')
+    df = ingestion.fetch_transactions()
+    ti.xcom_push(key='transactions', value=df.to_dict())
+    return df
+
+
+def fetch_cust_feedback(**kwargs):
+    ti = kwargs['ti']
+    transactions = pd.DataFrame(ti.xcom_pull(task_ids='fetch_transactions', key='transactions'))
+    ingestion.transactions = transactions
     return ingestion.fetch_cust_feedback()
 
 default_args = {
