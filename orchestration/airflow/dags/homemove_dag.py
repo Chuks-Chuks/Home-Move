@@ -3,6 +3,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import pandas as pd
+from pathlib import Path
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,40 +21,71 @@ except ImportError as ie:
 
 const = Constants()
 ingestion = gfd.IngestData()
+RAW_PATH = Path(const.RAW_PATH)
 
-def fetch_customers(**kwargs):
-    df = ingestion.fetch_customers()
-    kwargs['ti'].xcom_push(key='customers', value=df.to_dict())
-    return df
+def fetch_customers(**kwargs) -> str:
+    try:
+        df = ingestion.fetch_customers()
+        kwargs['ti'].xcom_push(key='customers', value=True)
+        return f"Customers data fetched successfully: {len(df)}"
+    except Exception as e:
+        logging.error(f"Failed to fetch customers: {str(e)}")
+        raise
 
 
-def fetch_properties(**kwargs):
-    df = ingestion.fetch_properties()
-    kwargs['ti'].xcom_push(key='properties', value=df.to_dict())
-    return df
+def fetch_properties(**kwargs) -> str:
+    try:
+        df = ingestion.fetch_properties()
+        kwargs['ti'].xcom_push(key='properties', value=True)
+        return f"Properties fetched successfully: {len(df)}"
+    except Exception as e:
+        logging.error(f"Failed to fetch properties: {str(e)}")
+        raise
 
 
 def fetch_transactions(**kwargs):
-    ti = kwargs['ti']
-    customers = pd.DataFrame(ti.xcom_pull(task_ids='fetch_customers', key='customers'))
-    properties = pd.DataFrame(ti.xcom_pull(task_ids='fetch_properties', key='properties'))
-    ingestion.customers = customers.to_dict('records')
-    ingestion.properties = properties.to_dict('records')
-    df = ingestion.fetch_transactions()
-    ti.xcom_push(key='transactions', value=df.to_dict())
-    return df
-
+    try:
+        ti = kwargs['ti']
+        if not ti.xcom_pull(task_ids='fetch_customers', key='customers'):
+            raise ValueError("Customer data not available")
+        if not ti.xcom_pull(task_ids='fetch_properties', key='properties'):
+            raise ValueError("Properties data not available")
+        
+    
+        customers = pd.read_csv(RAW_PATH  / "customers.csv")
+        properties = pd.read_csv(RAW_PATH / "properties.csv")
+   
+        ingestion.customers = customers.to_dict('records')
+        ingestion.properties = properties.to_dict('records')
+        df = ingestion.fetch_transactions()
+        df.to_csv(RAW_PATH/ "transactions.csv", index=False)
+        
+        ti.xcom_push(key='transactions', value=True)
+        return "transactions fetched successfully"
+    except Exception as e:
+        logging.error(f"Failed to fetch transactions: {str(e)}")
+        raise
 
 def fetch_cust_feedback(**kwargs):
-    ti = kwargs['ti']
-    transactions = pd.DataFrame(ti.xcom_pull(task_ids='fetch_transactions', key='transactions'))
-    ingestion.transactions = transactions
-    return ingestion.fetch_cust_feedback()
+    try:
+        ti = kwargs['ti']
+        if not ti.xcom_pull(task_ids='fetch_transactions', key='transactions'):
+            raise ValueError("Transactions data does not exist")
+        
+        transactions = pd.read_csv(RAW_PATH / "transactions.csv")
+
+        ingestion.transactions = transactions.to_dict('records')
+        df = ingestion.fetch_cust_feedback()
+        return "feedback fetched successfully"
+    except Exception as e:
+        logging.error(f"Failed to fetch feedback: {str(e)}")
+        raise
 
 default_args = {
     'owner': 'chuks-chuks',
     'retries': 1,
-    'retry_delay': timedelta(minutes=3)
+    'retry_delay': timedelta(minutes=3),
+    'provide_context': True
 }
 
 with DAG(
@@ -62,7 +94,8 @@ with DAG(
     description='ETL Pipeline for Homemove Project',
     start_date=datetime(2024, 1, 1),
     schedule_interval='@daily',
-    catchup=False
+    catchup=False,
+    tags=['etl', 'homemove']
 ) as dag:
     # Fetch the raw data 
 
@@ -93,8 +126,6 @@ with DAG(
         python_callable=fetch_cust_feedback,
         dag=dag
     )
-
-logging.info("Now tracking dependencies...")
 
 # Defining dependencies
 task_get_customers >> task_get_properties >> task_fetch_transactions >> task_fetch_cust_feedback
