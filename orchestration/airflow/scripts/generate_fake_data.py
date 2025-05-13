@@ -20,17 +20,18 @@ class IngestData(Constants):
         self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)  
         self.transactions = []
         self.transactions_ids = []
+        self.csat = []
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
 # Create the directory if it doesn't already exist. 
      # 1. Customers
-    def fetch_customers(self) -> None:
+    def fetch_customers(self) -> pd.DataFrame:
         """
         This method ingests the customer's data
 
         :returns:
-            None (Creates a file of the customer's details in the raw folder)
+            Pandas dataframe of the customer's details
         """
         try:
             for customer in range(self.NUM_CUSTOMERS):
@@ -47,7 +48,8 @@ class IngestData(Constants):
 
             df_customers = pd.DataFrame(self.customers)
             self.logger.info("The customers' details have been saved successfully")
-            return df_customers.to_csv(self.OUTPUT_DIR / "customers.csv", index=False)
+            df_customers.to_csv(self.OUTPUT_DIR / "customers.csv", index=False)
+            return df_customers
         except Exception as e:
             self.logger.error(f"An error has occurred and the customers' upload has failed:{str(e)}")
             raise
@@ -75,7 +77,8 @@ class IngestData(Constants):
 
             df_properties = pd.DataFrame(self.properties)
             self.logger.info("Properties fetched successfuy")
-            return df_properties.to_csv(self.OUTPUT_DIR / "properties.csv", index=False)
+            df_properties.to_csv(self.OUTPUT_DIR / "properties.csv", index=False)
+            return df_properties
         except Exception as e:
             self.logger.error(f"Failed to fetch properties: {str(e)}")
             raise
@@ -87,8 +90,12 @@ class IngestData(Constants):
 
         :returns:   
             None (Writes transaction details to the raw folder)
+            
         """
+        if not self.customers or not self.properties:
+            raise ValueError("Customers or properties data not loaded")
         try:
+            self.logger.info(f"Starting transactions with {len(self.customers)} customers and {len(self.properties)} properties")
             for transaction in range(self.NUM_TRANSACTIONS):
                 customer = choice(self.customers)
                 property_choice = choice(self.properties)
@@ -113,9 +120,11 @@ class IngestData(Constants):
 
             df_transactions = pd.DataFrame(self.transactions)
             self.logger.info("Transactions fetched successfuy")
-            return df_transactions.to_csv(self.OUTPUT_DIR / "transactions.csv", index=False)
+            df_transactions.to_csv(self.OUTPUT_DIR / "properties.csv", index=False)
+            return df_transactions
         except Exception as e:
             self.logger.error(f"Failed to fetch transactions {str(e)}")
+            raise
 
 
 
@@ -128,9 +137,13 @@ class IngestData(Constants):
                 None (Writes csv file to raw folder)
         """
         try:
+            if self.transactions and isinstance(self.transactions[0]['start_date'], str):
+                for t in self.transactions:
+                    t['start_date'] = pd.to_datetime(t['start_date']).date()
+
             for review in range(self.NUM_CSATS):
                 transaction = choice(self.transactions)
-                if transaction['status'] != 'Abadoned':
+                if transaction['status'] != 'Abandoned':
                     self.csat.append(
                         {
                             'survey_id': str(uuid.uuid4())[:6],
@@ -143,6 +156,8 @@ class IngestData(Constants):
 
             df_csat = pd.DataFrame(self.csat)
             self.logger.info("Customer feedback fetched successfully")
-            return df_csat.to_csv(self.OUTPUT_DIR / "csat_surveys.csv", index=False)
+            df_csat.to_csv(self.OUTPUT_DIR / "csat.csv", index=False)
+            return df_csat
         except Exception as e:
             self.logger.error(f"The customer feedback data has failed to load: {str(e)}")
+            raise
