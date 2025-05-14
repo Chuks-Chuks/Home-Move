@@ -5,7 +5,11 @@ USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         bash \
-        coreutils && \
+        coreutils \
+        procps \
+        openjdk-17-jdk \
+        python3-dev \
+        build-essential && \
     ln -sf bash /bin/sh && \
     rm -rf /var/lib/apt/lists/* && \
     echo "Bash installed at: $(which bash)" && \
@@ -19,18 +23,28 @@ RUN tar xzf /tmp/spark-3.5.0-bin-hadoop3.tgz -C /opt && \
 
 # Environment setup
 ENV SPARK_HOME=/opt/spark \
-    PATH="/opt/spark/bin:${PATH}" \
-    SHELL=/bin/bash
+    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \  
+    SHELL=/bin/bash \
+    PYTHONPATH=/opt/airflow 
+
+ENV PATH="/opt/spark/bin:${JAVA_HOME}/bin:${PATH}" \
+    PYSPARK_PYTHON=python3 \
+    PYSPARK_DRIVER_PYTHON=python3
 
 USER airflow
 
+# Update pip first to avoid hash verification issues
+RUN pip install --upgrade pip && \
+    pip cache purge
+
 RUN pip install --no-cache-dir \
     pyspark==3.5.0 \
+    faker==23.2.0 \
     pyarrow==14.0.2 \
     pandas==2.1.4 \
     apache-airflow-providers-apache-spark==4.3.0
 
-# Environment setup
-ENV SPARK_HOME=/opt/spark \
-    PATH="/opt/spark/bin:${PATH}" \
-    PYTHONPATH="/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip"
+# Final environment setup
+ENV PYTHONPATH="${PYTHONPATH}:/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip" \
+    AIRFLOW__CORE__DAGS_FOLDER="/opt/airflow/dags" \
+    AIRFLOW__CORE__LOAD_EXAMPLES="false"
