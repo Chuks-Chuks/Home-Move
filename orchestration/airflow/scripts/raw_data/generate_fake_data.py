@@ -120,7 +120,7 @@ class IngestData(Constants):
 
             df_transactions = pd.DataFrame(self.transactions)
             self.logger.info("Transactions fetched successfuy")
-            df_transactions.to_csv(self.OUTPUT_DIR / "properties.csv", index=False)
+            df_transactions.to_csv(self.OUTPUT_DIR / "transactions.csv", index=False)
             return df_transactions
         except Exception as e:
             self.logger.error(f"Failed to fetch transactions {str(e)}")
