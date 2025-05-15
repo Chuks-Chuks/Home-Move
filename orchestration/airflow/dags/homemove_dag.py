@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from scripts.constant_class import Constants
-    import scripts.generate_fake_data as gfd
+    import scripts.raw_data.generate_fake_data as gfd
 except ImportError as ie:
     logging.warning("Import failed! Now trying alternative solution")
     import sys
     sys.path.insert(0, '/opt/airflow')
     from scripts.constant_class import Constants
-    from scripts import generate_fake_data as gfd
+    import scripts.raw_data.generate_fake_data as gfd
 
 
 const = Constants()
