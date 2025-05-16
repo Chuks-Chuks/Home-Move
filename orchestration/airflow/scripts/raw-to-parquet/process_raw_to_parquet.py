@@ -1,9 +1,16 @@
 import logging
 from pathlib import Path
-from constant_class import Constants
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+try:
+    from scripts.constant_class import Constants
+except ImportError as ie:
+    logging.warning("Import failed! Now trying alternative solution")
+    import sys
+    sys.path.insert(0, '/opt/airflow')
+    from scripts.constant_class import Constants
+
 const = Constants()
 
 

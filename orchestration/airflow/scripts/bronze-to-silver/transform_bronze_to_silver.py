@@ -1,9 +1,17 @@
-from constant_class import Constants
 from pathlib import Path
+import logging
 
-# Start spark
+try:
+    from scripts.constant_class import Constants
+except ImportError as ie:
+    logging.warning("Import failed! Now trying alternative solution")
+    import sys
+    sys.path.insert(0, '/opt/airflow')
+    from scripts.constant_class import Constants
 
 const = Constants()
+
+# Start spark
 spark = const.start_spark('Transform Bronze to Silver')
 
 
@@ -28,20 +36,20 @@ csat = spark.read.parquet(f'{BRONZE_PATH}/csat')
     Transaction_file has both customer and property IDs. Both tables would be joined to the transactions table
 """
 
-customer_transactions = transactions \
-    .join(customers, 'customer_id', 'left') \
-    .join(properties, 'property_id') \
-        .select(
-    'transaction_id',
-    'customer_id',
-    'full_name',
-    'email',
-    'property_id',
-    'address',
-    'valuation',
-    'status',
-    'start_date',
-    'completion_date'
+customer_transactions = transactions.alias('trnxs') \
+    .join(customers.alias('cust'), on='customer_id', how='left') \
+    .join(properties.alias('prop'), on='property_id', how='left') \
+    .select(
+        'trnxs.transaction_id',
+        'cust.customer_id',
+        'cust.full_name',
+        'cust.email',
+        'prop.property_id',
+        'prop.address',
+        'prop.valuation',
+        'trnxs.status',
+        'trnxs.start_date',
+        'trnxs.completion_date'
 )
 
 # print(customer_transactions.printSchema())  # The results showed the completion_date to be a string.
@@ -58,19 +66,22 @@ customer_transactions = customer_transactions.withColumn('start_date', const.psq
 customer_transactions.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_transactions')
 
 """
-    The aim of the join is to measure customer satisfaction.
+    The aim of the join is to measure customer satisfaction. Check for solicitors who are linked with customer's who have performed.
     The customer table and customer feedback table will be joined. This is see the likelihood of customers recommending Movera
 """
 
-feedback_df = csat.join(transactions, on='transaction_id', how='left') \
-.join(customers, on='customer_id', how='left') \
+feedback_df = csat.alias('csat').join(transactions.alias('trx'), on='transaction_id', how='left') \
+.join(customers.alias('cust'), on='customer_id', how='left') \
 .select(
-    'customer_id',
-    'full_name',
-    'email',
-    'score',
-    const.psq.col('comment').alias('feedback'),
-    'survey_date'
+    'cust.customer_id',
+    'trx.transaction_id',
+    'cust.full_name',
+    'cust.email',
+    'cust.region',
+    'csat.score',
+    'trx.solicitor_name',
+    const.psq.col('csat.comment').alias('feedback'),
+    'csat.survey_date'
 )
 
 feedback_df.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_feedback')
@@ -79,20 +90,21 @@ feedback_df.write.mode('overwrite').parquet(f'{SILVER_PATH}/customer_feedback')
     The next join solves the question of how many houses have been purchased by how much, which customer
 """
 
-property_transactions = transactions.join(properties, on='property_id', how='left') \
-.join(customers, on='customer_id', how='left') \
+property_transactions = transactions.alias('trx').join(properties.alias('prop'), on='property_id', how='left') \
+.join(customers.alias('cust'), on='customer_id', how='left') \
 .select(
-    'transaction_id',
-    'customer_id',
-    'full_name',
-    'email',
-    'property_id',
-    'address', 
-    'property_type',
-    'valuation',
-    'status',
-    'start_date',
-    'completion_date'
+    'trx.transaction_id',
+    'cust.customer_id',
+    'cust.full_name',
+    'cust.email',
+    'prop.property_id',
+    'prop.address', 
+    'prop.property_type',
+    'prop.valuation',
+    'trx.status',
+    'trx.start_date',
+    'trx.completion_date',
+    'trx.solicitor_name'
 )
 
 property_transactions.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_transactions')
@@ -107,31 +119,31 @@ property_transactions.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_t
 
 # First, aggregating the transactions by customer_id
 
-transaction_summary = transactions.join(properties, on='property_id', how='left').groupBy('customer_id').agg(
-    const.psq.count('*').alias('num_transactions'),  # Finding the total number of transactions
-    const.psq.sum('valuation').alias('total_spent'),  # Finding the total amount spent
-   const.psq.avg('valuation').alias('avg_spent')  # Finding the average amount spent
+transaction_summary = transactions.alias('trx').join(properties.alias('prop'), on='property_id', how='left').groupBy('trx.customer_id').agg(
+    const.psq.count('trx.*').alias('num_transactions'),  # Finding the total number of transactions
+    const.psq.sum('prop.valuation').alias('total_spent'),  # Finding the total amount spent
+   const.psq.avg('prop.valuation').alias('avg_spent')  # Finding the average amount spent
 )
 
-feedback_summary = csat.join(transactions, on='transaction_id', how='left') \
-.join(customers, on='customer_id', how='left').groupBy(
-    'customer_id'
+feedback_summary = csat.alias('csat').join(transactions.alias('trx'), on='transaction_id', how='left') \
+.join(customers.alias('cust'), on='customer_id', how='left').groupBy(
+    'cust.customer_id'
 ).agg(
-    const.psq.count('*').alias('num_feedbacks'),
-    const.psq.avg('score').alias('avg_feedback_score')
+    const.psq.count('csat.*').alias('num_feedbacks'),
+    const.psq.avg('csat.score').alias('avg_feedback_score')
 )
 
 # Merging both transaction and summary tables
 
-summary_df = customers.join(feedback_summary, on='customer_id', how='left') \
-.join(transaction_summary, on='customer_id', how='left') \
+summary_df = customers.alias('cust').join(feedback_summary.alias('fbs'), on='customer_id', how='left') \
+.join(transaction_summary.alias('ts'), on='customer_id', how='left') \
 .fillna(
     {
-        'num_transactions': 0,
-        'total_spent': 0,
-        'avg_spent': 0.0,
-        'num_feedbacks': 0,
-        'avg_feedback_score': 0.0
+        'ts.num_transactions': 0,
+        'ts.total_spent': 0,
+        'ts.avg_spent': 0.0,
+        'fbs.num_feedbacks': 0,
+        'fbs.avg_feedback_score': 0.0
     }
 )
 
@@ -156,12 +168,12 @@ property_summary.write.mode('overwrite').parquet(f'{SILVER_PATH}/property_summar
     I will creating a transaction summary to detail which properties are being bought the most, total and average price. 
 """
 
-transaction_summary = transactions.join(properties, on='property_id', how='left') \
-.groupBy('property_type', 'status') \
+transaction_summary = transactions.alias('trx').join(properties.alias('prop'), on='property_id', how='left') \
+.groupBy('prop.property_type', 'trx.status') \
 .agg(
-    const.psq.count('*').alias('num_transactions'),
-    sum('valuation').alias('total_value'),
-    const.psq.avg('valuation').alias('avg_valuation')
+    const.psq.count('trx.*').alias('num_transactions'),
+    const.psq.sum('prop.valuation').alias('total_value'),
+    const.psq.avg('prop.valuation').alias('avg_valuation')
 )
 # transaction_summary.show()
 
